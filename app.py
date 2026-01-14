@@ -19,30 +19,25 @@ m = model.from_pretrained(type="rapid", device="cpu")  # Use "gpu" if available
 prepared = inference.prepare()
 print("Model loaded successfully!")
 
-
+"""
+Analyze a player's move by checking how likely it is at different rating levels.
+Returns estimated rating for this single move.
+"""
 def estimate_player_rating_from_move(fen_before_move, player_move_uci):
-    """
-    Analyze a player's move by checking how likely it is at different rating levels.
-    Returns estimated rating for this single move.
-    """
+
     move_scores = {}
 
     for test_elo in test_ratings:
-        try:
-            # Get move probabilities as if player were at this rating
-            probs, _ = inference.inference_each(
-                m, prepared, fen_before_move,
-                elo_self=test_elo,
-                elo_oppo=bot_elo
-            )
+        # Get move probabilities as if player were at this rating
+        probs, _ = inference.inference_each(
+            m, prepared, fen_before_move,
+            elo_self=test_elo,
+            elo_oppo=bot_elo
+        )
 
-            # Get probability of the actual move the player made
-            move_prob = probs.get(player_move_uci, 0.0)
-            move_scores[test_elo] = move_prob
-
-        except Exception as e:
-            print(f"Error evaluating at ELO {test_elo}: {e}")
-            move_scores[test_elo] = 0.0
+        # Get probability of the actual move the player made
+        move_prob = probs.get(player_move_uci, 0.0)
+        move_scores[test_elo] = move_prob
 
     print(f"Move {player_move_uci} probabilities at different ratings: {move_scores}")
 
@@ -136,6 +131,14 @@ def move():
         print(f"This move suggests rating: {move_rating}")
         print(f"Cumulative estimated rating: {player_elo_estimate}")
 
+        # Get win probability after player's move (from player's perspective)
+        _, player_win_prob = inference.inference_each(
+            m, prepared, board.fen(),
+            elo_self=player_elo_estimate,
+            elo_oppo=bot_elo
+        )
+        print(f"Player win probability after their move: {player_win_prob}")
+
         # Check if game is over after player's move
         if board.is_game_over():
             return jsonify({
@@ -145,6 +148,7 @@ def move():
                 "player_elo": player_elo_estimate,
                 "move_rating": move_rating,
                 "move_scores": move_scores,
+                "player_win_prob": player_win_prob,
                 "game_over": True,
                 "result": board.result()
             })
@@ -200,6 +204,17 @@ def move():
                 board.push_uci(bot_move_uci)
                 print(f"Fallback to: {bot_move_uci}")
 
+            # Get win probability after bot's move (from player's perspective)
+            if not board.is_game_over():
+                _, player_win_prob_after_bot = inference.inference_each(
+                    m, prepared, board.fen(),
+                    elo_self=player_elo_estimate,
+                    elo_oppo=bot_elo
+                )
+            else:
+                player_win_prob_after_bot = player_win_prob
+            print(f"Player win probability after bot's move: {player_win_prob_after_bot}")
+
             return jsonify({
                 "bot_move": bot_move_uci,
                 "fen": board.fen(),
@@ -207,6 +222,7 @@ def move():
                 "player_elo": player_elo_estimate,
                 "move_rating": move_rating,
                 "move_scores": move_scores,
+                "player_win_prob": player_win_prob_after_bot,
                 "game_over": board.is_game_over(),
                 "result": board.result() if board.is_game_over() else None
             })

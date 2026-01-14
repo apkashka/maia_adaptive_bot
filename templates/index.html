@@ -111,6 +111,40 @@
       color: #1976d2;
       font-size: 20px;
     }
+    .win-prob-container {
+      margin-top: 15px;
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    .win-prob-label {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .win-prob-bar {
+      height: 24px;
+      background: #e0e0e0;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .win-prob-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50 0%, #8bc34a 100%);
+      transition: width 0.5s ease-in-out;
+      border-radius: 12px;
+    }
+    .win-prob-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+      text-shadow: 0 0 3px white;
+    }
     .thinking {
       text-align: center;
       color: #666;
@@ -173,6 +207,13 @@
         <div style="font-size: 14px; margin-top: 5px; color: #666;">
           Last move rated: <span id="moveRating">-</span>
         </div>
+        <div class="win-prob-container">
+          <div class="win-prob-label">Your Win Probability</div>
+          <div class="win-prob-bar">
+            <div class="win-prob-fill" id="winProbFill" style="width: 50%;"></div>
+            <div class="win-prob-text" id="winProbText">50%</div>
+          </div>
+        </div>
       </div>
 
       <div class="info">
@@ -193,13 +234,35 @@
     var waitingForBot = false;
 
     // Helper function to update bot and player ELO in UI
-    function updateBotElo(elo, playerElo, moveRating) {
+    function updateBotElo(elo, playerElo, moveRating, winProb) {
       document.getElementById('botElo').textContent = Math.round(elo);
       if (playerElo !== undefined) {
         document.getElementById('playerElo').textContent = Math.round(playerElo);
       }
       if (moveRating !== undefined) {
         document.getElementById('moveRating').textContent = Math.round(moveRating) + ' ELO';
+      }
+      if (winProb !== undefined) {
+        updateWinProbability(winProb);
+      }
+    }
+
+    // Helper function to update win probability bar
+    function updateWinProbability(prob) {
+      var percentage = Math.round(prob * 100);
+      var fill = document.getElementById('winProbFill');
+      var text = document.getElementById('winProbText');
+
+      fill.style.width = percentage + '%';
+      text.textContent = percentage + '%';
+
+      // Change color based on probability
+      if (percentage >= 60) {
+        fill.style.background = 'linear-gradient(90deg, #4caf50 0%, #8bc34a 100%)';
+      } else if (percentage >= 40) {
+        fill.style.background = 'linear-gradient(90deg, #ff9800 0%, #ffc107 100%)';
+      } else {
+        fill.style.background = 'linear-gradient(90deg, #f44336 0%, #ff5722 100%)';
       }
     }
 
@@ -307,7 +370,7 @@
           }
 
           updateStatus();
-          updateBotElo(data.bot_elo, data.player_elo, data.move_rating);
+          updateBotElo(data.bot_elo, data.player_elo, data.move_rating, data.player_win_prob);
 
           waitingForBot = false;
         })
