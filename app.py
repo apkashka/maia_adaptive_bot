@@ -10,6 +10,7 @@ app = Flask(__name__)
 board = chess.Board()
 bot_elo = 900
 player_elo_estimate = 1050
+initial_player_elo = 1050  # Rating selected at game start
 move_history = []  # Store player's move evaluations
 test_ratings = [1000, 1200, 1400, 1600, 1800, 2000]
 
@@ -46,25 +47,34 @@ def estimate_player_rating_from_move(fen_before_move, player_move_uci):
         print(f'Error. No data found. Returning 1100')
         return 1100, move_scores  # Default if no data
 
-    if all(p == 0 for p in move_scores.values()):
-        print(f'Unlikely move for each score. Making weighted_rating closer to bot')
+
+    min_prob = min(move_scores.values())
+    max_prob = max(move_scores.values())
+    discriminative_power = max_prob - min_prob
+
+    if all(p == 0 for p in move_scores.values()) or discriminative_power < 0.2:
+        print(f'Unlikely or likely move for each score. Making weighted_rating closer to bot')
         weighted_rating = int (bot_elo + player_elo_estimate) / 2
         return weighted_rating, move_scores
+
 
     top2 = sorted(
         move_scores.items(),
         key=lambda x: (-x[1], x[0])
     )[:2]
-    weighted_rating = min(top2[0][0], top2[1][0])
+
+    weighted_rating = (top2[0][0] + top2[1][0]) // 2
     print(f"Weighted rating {weighted_rating}")
     return weighted_rating, move_scores
 
 
+
+
+"""
+Calculate player's estimated rating based on all moves played so far.
+Recent moves are weighted more heavily.
+"""
 def get_cumulative_player_rating():
-    """
-    Calculate player's estimated rating based on all moves played so far.
-    Recent moves are weighted more heavily.
-    """
     if not move_history:
         return 1100
 
@@ -78,7 +88,7 @@ def get_cumulative_player_rating():
         weighted_sum += rating * weight
         total_weight += weight
 
-    cumulative_rating = int(weighted_sum / total_weight) if total_weight > 0 else 1100
+    cumulative_rating = int(weighted_sum / total_weight)
 
     print(f"Cumulative rating from {len(move_history)} moves: {cumulative_rating}")
     return cumulative_rating
@@ -122,7 +132,15 @@ def move():
 
         # Analyze player's move at different rating levels
         print(f"\n--- Analyzing player move: {player_move} ---")
-        move_rating, move_scores = estimate_player_rating_from_move(fen_before, player_move)
+
+        # For the first move, use the initial rating selected at game start
+        if len(move_history) == 0:
+            print(f"First move - using initial rating: {initial_player_elo}")
+            move_rating = initial_player_elo
+            move_scores = {elo: 0.0 for elo in test_ratings}  # Placeholder
+        else:
+            move_rating, move_scores = estimate_player_rating_from_move(fen_before, player_move)
+
         move_history.append((move_rating, move_scores))
 
         # Get cumulative rating estimate
@@ -132,10 +150,12 @@ def move():
         print(f"Cumulative estimated rating: {player_elo_estimate}")
 
         # Get win probability after player's move (from player's perspective)
+
+        medium_rating = (player_elo_estimate + bot_elo) / 2
         _, player_win_prob = inference.inference_each(
             m, prepared, board.fen(),
-            elo_self=player_elo_estimate,
-            elo_oppo=bot_elo
+            elo_self=medium_rating,
+            elo_oppo=medium_rating
         )
         print(f"Player win probability after their move: {player_win_prob}")
 
@@ -154,7 +174,19 @@ def move():
             })
 
         # Adjust bot rating slowly toward player rating (but stay weaker)
-        target_bot_elo = player_elo_estimate - 200  # Bot should be 200 points weaker
+        win_delta = -200
+        match True:
+            case _ if player_win_prob > 0.85:
+                win_delta = 100
+            case _ if player_win_prob > 0.75:
+                win_delta = 50
+            case _ if player_win_prob > 0.65:
+                win_delta = 0
+            case _ if player_win_prob > 0.5:
+                win_delta = -100
+
+
+        target_bot_elo = player_elo_estimate - 150 + win_delta
         bot_elo = (target_bot_elo + bot_elo) / 2
 
         print(f"Bot rating adjusted: {bot_elo} (target: {target_bot_elo})")
@@ -181,7 +213,7 @@ def move():
             print(f"Maia returned info: {maia_info}")
             print(f"Maia returned {len(probs)} possible moves")
             print(f"Top 5 moves with probabilities:")
-            sorted_moves = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
+            sorted_moves = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:3]
             for move, prob in sorted_moves:
                 # Parse move to understand what piece is moving where
                 from_sq = move[:2]
@@ -190,9 +222,15 @@ def move():
                 print(f"  {move}: {prob:.4f} (moving {piece_on_from} from {from_sq} to {to_sq})")
 
             # Select the most probable move
-            bot_move_uci = sorted_moves[0][0]
 
-            print(f"\nBot selected: {bot_move_uci} (probability: {sorted_moves[0][1]:.4f})")
+            moves = [mv for mv, p in sorted_moves]
+            weights = [p for mv, p in sorted_moves]
+
+            # Выбор хода с учётом вероятностей
+            bot_move_uci = random.choices(moves, weights=weights, k=1)[0]
+            selected_prob = dict(sorted_moves)[bot_move_uci]
+
+            print(f"\nBot selected: {bot_move_uci} (probability: {selected_prob:.4f})")
 
             # Make bot's move
             try:
@@ -204,12 +242,13 @@ def move():
                 board.push_uci(bot_move_uci)
                 print(f"Fallback to: {bot_move_uci}")
 
+            medium_rating = (player_elo_estimate+ bot_elo) / 2
             # Get win probability after bot's move (from player's perspective)
             if not board.is_game_over():
                 _, player_win_prob_after_bot = inference.inference_each(
                     m, prepared, board.fen(),
-                    elo_self=player_elo_estimate,
-                    elo_oppo=bot_elo
+                    elo_self=medium_rating,
+                    elo_oppo=medium_rating
                 )
             else:
                 player_win_prob_after_bot = player_win_prob
@@ -236,8 +275,9 @@ def move():
 
 @app.route("/set_initial_rating", methods=["POST"])
 def set_initial_rating():
-    global bot_elo, player_elo_estimate
+    global bot_elo, player_elo_estimate, initial_player_elo
     player_elo_estimate = request.json.get("player_elo", 1100)
+    initial_player_elo = player_elo_estimate  # Save for first move
     bot_elo = player_elo_estimate - 150
     print(f"Initial bot rating set to: {bot_elo}")
     print(f"Initial player rating estimate set to: {player_elo_estimate}")
@@ -249,9 +289,10 @@ def set_initial_rating():
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    global board, bot_elo, player_elo_estimate, move_history
+    global board, bot_elo, player_elo_estimate, initial_player_elo, move_history
     board = chess.Board()
     player_elo_estimate = 1150  # Reset player estimate
+    initial_player_elo = 1150  # Reset initial rating
     bot_elo = 1000  # Reset to starting difficulty
     move_history = []  # Clear move history
     return jsonify({
