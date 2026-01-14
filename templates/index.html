@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Chess vs Maia 2</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    /* Level selection screen */
+    #levelSelection {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    #levelSelection h2 {
+      color: #667eea;
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+    #levelSelection p {
+      color: #666;
+      font-size: 18px;
+      margin-bottom: 40px;
+    }
+    .level-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .level-btn {
+      padding: 20px 30px;
+      font-size: 18px;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    .level-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    .level-btn .level-name {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 5px;
+    }
+    .level-btn .level-desc {
+      display: block;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    /* Game screen */
+    #gameScreen {
+      display: none;
+    }
+    #board {
+      width: 500px;
+      margin: 20px auto;
+    }
+    .info {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 18px;
+    }
+    .status {
+      font-weight: bold;
+      color: #333;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    .bot-info {
+      text-align: center;
+      margin: 15px 0;
+      padding: 10px;
+      background: #e3f2fd;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .bot-elo {
+      font-weight: bold;
+      color: #1976d2;
+      font-size: 20px;
+    }
+    .thinking {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      margin: 10px 0;
+      display: none;
+    }
+    .error {
+      color: #d32f2f;
+      text-align: center;
+      padding: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Level Selection Screen -->
+    <div id="levelSelection">
+      <h1>♔ Chess vs Maia 2 ♚</h1>
+      <h2>Select Your Level</h2>
+      <p>The AI will adapt to your playing strength</p>
+
+      <div class="level-buttons">
+        <button class="level-btn" onclick="startGame(1000)">
+          <span class="level-name">Absolute Beginner</span>
+          <span class="level-desc">Just learning the rules(1000)</span>
+        </button>
+
+        <button class="level-btn" onclick="startGame(1200)">
+          <span class="level-name">Played with Grandpa</span>
+          <span class="level-desc">Casual games for fun(1200)</span>
+        </button>
+
+        <button class="level-btn" onclick="startGame(1400)">
+          <span class="level-name">Interested in Chess</span>
+          <span class="level-desc">Know openings and tactics(1400)</span>
+        </button>
+
+        <button class="level-btn" onclick="startGame(1600)">
+          <span class="level-name">Participating in Tournaments</span>
+          <span class="level-desc">Competitive player(1600)</span>
+        </button>
+
+        <button class="level-btn" onclick="startGame(2000)">
+          <span class="level-name">ChessFucker</span>
+          <span class="level-desc">Unreal Pro (2000)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen">
+      <h1>♔ Chess vs Maia 2 ♚</h1>
+      <p style="text-align: center; color: #666;">Play against an adaptive AI</p>
+
+      <div class="bot-info">
+        Bot Rating: <span class="bot-elo" id="botElo">800</span> |
+        Your Estimated Rating: <span class="bot-elo" id="playerElo">1100</span>
+        <div style="font-size: 14px; margin-top: 5px; color: #666;">
+          Last move rated: <span id="moveRating">-</span>
+        </div>
+      </div>
+
+      <div class="info">
+        <div class="status" id="status">White to move</div>
+      </div>
+
+      <div class="thinking" id="thinking">Bot is thinking...</div>
+      <div class="error" id="error"></div>
+
+      <div id="board"></div>
+    </div>
+  </div>
+
+  <script>
+    var game = null;
+    var board = null;
+    var playerColor = 'white';
+    var waitingForBot = false;
+
+    // Helper function to update bot and player ELO in UI
+    function updateBotElo(elo, playerElo, moveRating) {
+      document.getElementById('botElo').textContent = Math.round(elo);
+      if (playerElo !== undefined) {
+        document.getElementById('playerElo').textContent = Math.round(playerElo);
+      }
+      if (moveRating !== undefined) {
+        document.getElementById('moveRating').textContent = Math.round(moveRating) + ' ELO';
+      }
+    }
+
+    function startGame(startingElo) {
+
+      // Hide level selection, show game
+      document.getElementById('levelSelection').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+
+      // Initialize the game first (without loading state yet)
+      initializeChessGame();
+
+      // Set initial bot rating on backend and update UI when done
+      fetch('/set_initial_rating', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ player_elo: startingElo })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Update UI with correct ratings immediately
+        updateBotElo(data.bot_elo, data.player_elo);
+        console.log('Initial ratings set:', data);
+      })
+      .catch(error => {
+        console.error('Error setting initial rating:', error);
+      });
+    }
+
+    function initializeChessGame() {
+      game = new Chess();
+
+      function showThinking(show) {
+        document.getElementById('thinking').style.display = show ? 'block' : 'none';
+      }
+
+      function showError(message) {
+        var errorDiv = document.getElementById('error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = message ? 'block' : 'none';
+      }
+
+      function updateStatus() {
+        var status = '';
+        var moveColor = 'White';
+
+        if (game.turn() === 'b') {
+          moveColor = 'Black';
+        }
+
+        if (game.in_checkmate()) {
+          status = 'Game over - ' + moveColor + ' is in checkmate!';
+        } else if (game.in_draw()) {
+          status = 'Game over - Draw';
+        } else if (game.in_stalemate()) {
+          status = 'Game over - Stalemate';
+        } else {
+          status = moveColor + ' to move';
+          if (game.in_check()) {
+            status += ' (in check)';
+          }
+        }
+
+        document.getElementById('status').innerHTML = status;
+      }
+
+      function getBotMove(playerMove) {
+        waitingForBot = true;
+        showThinking(true);
+        showError('');
+
+        fetch('/move', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ move: playerMove })
+        })
+        .then(response => response.json())
+        .then(data => {
+          showThinking(false);
+
+          console.log('Bot response:', data);
+
+          // Check for error response from server
+          if (data.error) {
+            showError('Bot error: ' + data.error);
+            waitingForBot = false;
+            console.error('Server returned error:', data.error);
+            return;
+          }
+
+          // Sync the board state with the backend FEN
+          if (data.fen) {
+            game.load(data.fen);
+            board.position(data.fen);
+            console.log('Synced board to FEN:', data.fen);
+          }
+
+          // Show move analysis
+          if (data.move_scores) {
+            console.log('Move analysis:', data.move_scores);
+          }
+
+          updateStatus();
+          updateBotElo(data.bot_elo, data.player_elo, data.move_rating);
+
+          waitingForBot = false;
+        })
+        .catch(error => {
+          showThinking(false);
+          showError('Error connecting to bot: ' + error.message);
+          waitingForBot = false;
+          console.error('Error:', error);
+        });
+      }
+
+      function onDragStart(source, piece, position, orientation) {
+        if (waitingForBot) return false;
+        if (game.game_over()) return false;
+
+        // Only allow player to move their pieces
+        if ((playerColor === 'white' && piece.search(/^b/) !== -1) ||
+            (playerColor === 'black' && piece.search(/^w/) !== -1)) {
+          return false;
+        }
+
+        // Don't allow moves when it's not player's turn
+        if ((game.turn() === 'w' && playerColor === 'black') ||
+            (game.turn() === 'b' && playerColor === 'white')) {
+          return false;
+        }
+      }
+
+      function onDrop(source, target) {
+        showError('');
+
+        var move = game.move({
+          from: source,
+          to: target,
+          promotion: 'q'
+        });
+
+        if (move === null) return 'snapback';
+
+        updateStatus();
+
+        // Get bot's response
+        getBotMove(move.from + move.to);
+      }
+
+      function onSnapEnd() {
+        board.position(game.fen());
+      }
+
+      var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+      };
+
+      board = Chessboard('board', config);
+
+      updateStatus();
+    }
+  </script>
+</body>
+</html>
