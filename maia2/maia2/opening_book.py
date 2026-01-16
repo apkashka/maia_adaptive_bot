@@ -10,11 +10,15 @@ import chess.polyglot
 from typing import Dict, Optional
 
 
+# Get directory where this module is located
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+_OPENING_BOOKS_DIR = os.path.join(_MODULE_DIR, 'opening_books')
+
 # Configuration: Opening books for different skill levels
 OPENING_BOOKS_CONFIG = {
-    'weak_medium': 'maia2/maia2/opening_books/Human.bin',        # ELO 800-1600
-    'medium': 'maia2/maia2/opening_books/rodent.bin',       # ELO 1600-1900
-    'strong': 'maia2/maia2/opening_books/Titans.bin',              # ELO 1900-2400+
+    'weak_medium': os.path.join(_OPENING_BOOKS_DIR, 'Human.bin'),      # ELO 800-1600
+    'medium': os.path.join(_OPENING_BOOKS_DIR, 'rodent.bin'),          # ELO 1600-1900
+    'strong': os.path.join(_OPENING_BOOKS_DIR, 'Titans.bin'),          # ELO 1900-2400+
 }
 
 def get_opening_book_path(elo: int) -> str:

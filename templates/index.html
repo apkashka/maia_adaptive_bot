@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Chess vs Maia 2</title>
+  <title>Adaptive Chess Bot</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
@@ -145,11 +145,20 @@
       color: #333;
       text-shadow: 0 0 3px white;
     }
-    .thinking {
+    .turn-indicator {
       text-align: center;
+      margin: 10px 0;
+      height: 24px;
+      line-height: 24px;
+    }
+    .thinking {
       color: #666;
       font-style: italic;
-      margin: 10px 0;
+      display: none;
+    }
+    .your-turn {
+      color: #4caf50;
+      font-weight: bold;
       display: none;
     }
     .error {
@@ -164,29 +173,29 @@
   <div class="container">
     <!-- Level Selection Screen -->
     <div id="levelSelection">
-      <h1>♔ Chess vs Maia 2 ♚</h1>
+      <h1>♔ Adaptive Chess Bot ♚</h1>
       <h2>Select Your Level</h2>
       <p>The AI will adapt to your playing strength</p>
 
       <div class="level-buttons">
         <button class="level-btn" onclick="startGame(1000)">
           <span class="level-name">Absolute Beginner</span>
-          <span class="level-desc">Just learning the rules(1000)</span>
+          <span class="level-desc">Just learning the rules (1000)</span>
         </button>
 
         <button class="level-btn" onclick="startGame(1200)">
           <span class="level-name">Played with Grandpa</span>
-          <span class="level-desc">Casual games for fun(1200)</span>
+          <span class="level-desc">Casual games for fun (1200)</span>
         </button>
 
         <button class="level-btn" onclick="startGame(1400)">
           <span class="level-name">Interested in Chess</span>
-          <span class="level-desc">Know openings and tactics(1400)</span>
+          <span class="level-desc">Know openings and tactics (1400)</span>
         </button>
 
         <button class="level-btn" onclick="startGame(1600)">
           <span class="level-name">Participating in Tournaments</span>
-          <span class="level-desc">Competitive player(1600)</span>
+          <span class="level-desc">Competitive player (1600)</span>
         </button>
 
         <button class="level-btn" onclick="startGame(2000)">
@@ -198,7 +207,7 @@
 
     <!-- Game Screen -->
     <div id="gameScreen">
-      <h1>♔ Chess vs Maia 2 ♚</h1>
+      <h1>♔ Adaptive Chess Bot ♚</h1>
       <p style="text-align: center; color: #666;">Play against an adaptive AI</p>
 
       <div class="bot-info">
@@ -220,7 +229,10 @@
         <div class="status" id="status">White to move</div>
       </div>
 
-      <div class="thinking" id="thinking">Bot is thinking...</div>
+      <div class="turn-indicator">
+        <span class="thinking" id="thinking">Bot is thinking...</span>
+        <span class="your-turn" id="yourTurn">Your turn to move</span>
+      </div>
       <div class="error" id="error"></div>
 
       <div id="board"></div>
@@ -232,6 +244,7 @@
     var board = null;
     var playerColor = 'white';
     var waitingForBot = false;
+    var gameId = null;  // Session ID for multiplayer support
 
     // Helper function to update bot and player ELO in UI
     function updateBotElo(elo, playerElo, moveRating, winProb) {
@@ -267,16 +280,15 @@
     }
 
     function startGame(startingElo) {
-
       // Hide level selection, show game
       document.getElementById('levelSelection').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
 
-      // Initialize the game first (without loading state yet)
+      // Initialize the chess board
       initializeChessGame();
 
-      // Set initial bot rating on backend and update UI when done
-      fetch('/set_initial_rating', {
+      // Create new game session on backend
+      fetch('/new_game', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -285,12 +297,12 @@
       })
       .then(response => response.json())
       .then(data => {
-        // Update UI with correct ratings immediately
+        gameId = data.game_id;  // Save session ID
         updateBotElo(data.bot_elo, data.player_elo);
-        console.log('Initial ratings set:', data);
+        console.log('New game created:', gameId, data);
       })
       .catch(error => {
-        console.error('Error setting initial rating:', error);
+        console.error('Error creating game:', error);
       });
     }
 
@@ -298,7 +310,9 @@
       game = new Chess();
 
       function showThinking(show) {
-        document.getElementById('thinking').style.display = show ? 'block' : 'none';
+        var gameOver = game && game.game_over();
+        document.getElementById('thinking').style.display = (show && !gameOver) ? 'inline' : 'none';
+        document.getElementById('yourTurn').style.display = (!show && !gameOver) ? 'inline' : 'none';
       }
 
       function showError(message) {
@@ -329,6 +343,12 @@
         }
 
         document.getElementById('status').innerHTML = status;
+
+        // Update turn indicator (hides both if game is over)
+        if (game.game_over()) {
+          document.getElementById('thinking').style.display = 'none';
+          document.getElementById('yourTurn').style.display = 'none';
+        }
       }
 
       function getBotMove(playerMove) {
@@ -341,7 +361,10 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ move: playerMove })
+          body: JSON.stringify({
+            game_id: gameId,  // Include session ID
+            move: playerMove
+          })
         })
         .then(response => response.json())
         .then(data => {
@@ -432,6 +455,7 @@
       board = Chessboard('board', config);
 
       updateStatus();
+      showThinking(false);  // Show "Your turn" initially
     }
   </script>
 </body>
