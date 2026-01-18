@@ -2,12 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adaptive Chess Bot</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: Arial, sans-serif;
       max-width: 800px;
@@ -82,7 +86,8 @@
       display: none;
     }
     #board {
-      width: 500px;
+      width: 100%;
+      max-width: 500px;
       margin: 20px auto;
     }
     .info {
@@ -161,11 +166,46 @@
       font-weight: bold;
       display: none;
     }
+    .game-over {
+      color: #1976d2;
+      font-weight: bold;
+      display: none;
+    }
     .error {
       color: #d32f2f;
       text-align: center;
       padding: 10px;
       display: none;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 600px) {
+      body {
+        margin: 10px auto;
+        padding: 10px;
+      }
+      .container {
+        padding: 15px;
+        border-radius: 10px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      #levelSelection h2 {
+        font-size: 22px;
+      }
+      .level-btn {
+        padding: 15px 20px;
+      }
+      .level-btn .level-name {
+        font-size: 16px;
+      }
+      .bot-info {
+        font-size: 14px;
+      }
+      .bot-elo {
+        font-size: 18px;
+      }
     }
   </style>
 </head>
@@ -225,13 +265,10 @@
         </div>
       </div>
 
-      <div class="info">
-        <div class="status" id="status">White to move</div>
-      </div>
-
       <div class="turn-indicator">
         <span class="thinking" id="thinking">Bot is thinking...</span>
         <span class="your-turn" id="yourTurn">Your turn to move</span>
+        <span class="game-over" id="gameOver"></span>
       </div>
       <div class="error" id="error"></div>
 
@@ -322,32 +359,28 @@
       }
 
       function updateStatus() {
-        var status = '';
-        var moveColor = 'White';
+        var gameOverEl = document.getElementById('gameOver');
 
-        if (game.turn() === 'b') {
-          moveColor = 'Black';
-        }
-
-        if (game.in_checkmate()) {
-          status = 'Game over - ' + moveColor + ' is in checkmate!';
-        } else if (game.in_draw()) {
-          status = 'Game over - Draw';
-        } else if (game.in_stalemate()) {
-          status = 'Game over - Stalemate';
-        } else {
-          status = moveColor + ' to move';
-          if (game.in_check()) {
-            status += ' (in check)';
-          }
-        }
-
-        document.getElementById('status').innerHTML = status;
-
-        // Update turn indicator (hides both if game is over)
         if (game.game_over()) {
+          // Hide turn indicators
           document.getElementById('thinking').style.display = 'none';
           document.getElementById('yourTurn').style.display = 'none';
+
+          // Show game over message
+          var message = '';
+          if (game.in_checkmate()) {
+            var loser = game.turn() === 'w' ? 'White' : 'Black';
+            message = loser + ' is in checkmate!';
+          } else if (game.in_stalemate()) {
+            message = 'Stalemate!';
+          } else if (game.in_draw()) {
+            message = 'Draw!';
+          }
+
+          gameOverEl.textContent = message;
+          gameOverEl.style.display = 'inline';
+        } else {
+          gameOverEl.style.display = 'none';
         }
       }
 
@@ -435,8 +468,12 @@
 
         updateStatus();
 
-        // Get bot's response
-        getBotMove(move.from + move.to);
+        // Get bot's response (include promotion piece if applicable)
+        var moveUci = move.from + move.to;
+        if (move.promotion) {
+          moveUci += move.promotion;
+        }
+        getBotMove(moveUci);
       }
 
       function onSnapEnd() {
@@ -453,6 +490,11 @@
       };
 
       board = Chessboard('board', config);
+
+      // Resize board on window resize for mobile
+      window.addEventListener('resize', function() {
+        board.resize();
+      });
 
       updateStatus();
       showThinking(false);  // Show "Your turn" initially
