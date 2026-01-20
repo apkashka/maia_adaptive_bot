@@ -209,17 +209,10 @@ def move():
         print(f"This move suggests rating: {move_rating}")
         print(f"Cumulative estimated rating: {game['player_elo']}")
 
-        # Get win probability after player's move
-        medium_rating = (game['player_elo'] + game['bot_elo']) / 2
-        _, player_win_prob = inference.inference_each(
-            m, prepared, board.fen(),
-            elo_self=medium_rating,
-            elo_oppo=medium_rating
-        )
-        print(f"Player win probability after their move: {player_win_prob}")
-
         # Check if game is over after player's move
         if board.is_game_over():
+            result = board.result()
+            player_win_prob = 1.0 if result == "1-0" else (0.0 if result == "0-1" else 0.5)
             return jsonify({
                 "bot_move": None,
                 "fen": board.fen(),
@@ -229,8 +222,17 @@ def move():
                 "move_scores": move_scores,
                 "player_win_prob": player_win_prob,
                 "game_over": True,
-                "result": board.result()
+                "result": result
             })
+
+        # Get win probability after player's move
+        medium_rating = (game['player_elo'] + game['bot_elo']) / 2
+        _, player_win_prob = inference.inference_each(
+            m, prepared, board.fen(),
+            elo_self=medium_rating,
+            elo_oppo=medium_rating
+        )
+        print(f"Player win probability after their move: {player_win_prob}")
 
         # Adjust bot rating based on win probability
         win_delta = -200
