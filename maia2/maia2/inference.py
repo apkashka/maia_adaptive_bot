@@ -145,7 +145,7 @@ def prepare():
     return [all_moves_dict, elo_dict, all_moves_dict_reversed]
 
 
-def inference_each(model, prepared, fen, elo_self, elo_oppo):
+def inference_each(model, prepared, fen, elo_self, elo_oppo, use_opening_book=True):
     all_moves_dict, elo_dict, all_moves_dict_reversed = prepared
 
     # Save original ELO before preprocessing transforms it
@@ -188,12 +188,13 @@ def inference_each(model, prepared, fen, elo_self, elo_oppo):
     move_probs = dict(sorted(move_probs.items(), key=lambda item: item[1], reverse=True))
 
     # Use opening book for early game positions (first 10 half-moves)
-    print(f"[Opening Book] Checking position: {fen} (ELO: {original_elo_self})")
-    move_probs, used_book = get_opening_book_or_fallback(fen, move_probs, elo_self=original_elo_self, max_halfmoves=10)
-    if used_book:
-        print(f"[Opening Book] OK Using opening book moves")
-        print(f"[Opening Book] Top 5 moves: {list(move_probs.items())[:5]}")
-    else:
-        print(f"[Opening Book] Using model predictions (not in opening or API failed)")
+    if use_opening_book:
+        print(f"[Opening Book] Checking position: {fen} (ELO: {original_elo_self})")
+        move_probs, used_book = get_opening_book_or_fallback(fen, move_probs, elo_self=original_elo_self, max_halfmoves=10)
+        if used_book:
+            print(f"[Opening Book] OK Using opening book moves")
+            print(f"[Opening Book] Top 5 moves: {list(move_probs.items())[:5]}")
+        else:
+            print(f"[Opening Book] Using model predictions (not in opening or API failed)")
 
     return move_probs, win_prob

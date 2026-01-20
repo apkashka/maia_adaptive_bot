@@ -47,6 +47,40 @@
       font-size: 18px;
       margin-bottom: 40px;
     }
+    .method-selection {
+      max-width: 500px;
+      margin: 0 auto 20px auto;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .method-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 10px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .method-option:has(input:checked) {
+      border-color: #667eea;
+      background: #f0f3ff;
+    }
+    .method-option input[type="radio"] {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    .method-option label {
+      cursor: pointer;
+    }
+    .method-option .method-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
     .level-buttons {
       display: flex;
       flex-direction: column;
@@ -217,6 +251,21 @@
       <h2>Select Your Level</h2>
       <p>The AI will adapt to your playing strength</p>
 
+      <div class="method-selection">
+        <div class="method-option">
+          <input type="radio" id="methodBayesian" name="ratingMethod" value="bayesian" checked>
+          <label for="methodBayesian">
+            <span class="method-name">Bayesian</span>
+          </label>
+        </div>
+        <div class="method-option">
+          <input type="radio" id="methodWeighted" name="ratingMethod" value="weighted_avg">
+          <label for="methodWeighted">
+            <span class="method-name">Weighted Avg</span>
+          </label>
+        </div>
+      </div>
+
       <div class="level-buttons">
         <button class="level-btn" onclick="startGame(1000)">
           <span class="level-name">Absolute Beginner</span>
@@ -317,6 +366,9 @@
     }
 
     function startGame(startingElo) {
+      // Get selected rating method
+      var ratingMethod = document.querySelector('input[name="ratingMethod"]:checked').value;
+
       // Hide level selection, show game
       document.getElementById('levelSelection').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
@@ -330,13 +382,16 @@
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ player_elo: startingElo })
+        body: JSON.stringify({
+          player_elo: startingElo,
+          rating_method: ratingMethod
+        })
       })
       .then(response => response.json())
       .then(data => {
         gameId = data.game_id;  // Save session ID
         updateBotElo(data.bot_elo, data.player_elo);
-        console.log('New game created:', gameId, data);
+        console.log('New game created:', gameId, 'method:', ratingMethod, data);
       })
       .catch(error => {
         console.error('Error creating game:', error);
@@ -495,6 +550,20 @@
       window.addEventListener('resize', function() {
         board.resize();
       });
+
+      // Prevent page scroll only when dragging a piece
+      var isDragging = false;
+      document.getElementById('board').addEventListener('mousedown', function(e) {
+        if (e.target.closest('.piece-417db')) isDragging = true;
+      });
+      document.getElementById('board').addEventListener('touchstart', function(e) {
+        if (e.target.closest('.piece-417db')) isDragging = true;
+      }, { passive: true });
+      document.addEventListener('mouseup', function() { isDragging = false; });
+      document.addEventListener('touchend', function() { isDragging = false; });
+      document.addEventListener('touchmove', function(e) {
+        if (isDragging) e.preventDefault();
+      }, { passive: false });
 
       updateStatus();
       showThinking(false);  // Show "Your turn" initially
