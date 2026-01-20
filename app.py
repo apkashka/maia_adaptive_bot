@@ -70,7 +70,8 @@ def estimate_player_rating_from_move(game, fen_before_move, player_move_uci):
         probs, _ = inference.inference_each(
             m, prepared, fen_before_move,
             elo_self=test_elo,
-            elo_oppo=game['bot_elo']
+            elo_oppo=game['bot_elo'],
+            use_opening_book=False  # Use raw Maia model for rating estimation
         )
         move_prob = probs.get(player_move_uci, 0.0)
         move_scores[test_elo] = move_prob
